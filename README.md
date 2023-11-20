@@ -12,11 +12,11 @@ Create your API user in your AppDynamics controller - [click here for docs](http
 
 Just follow the steps in the first part. You will not need to generate a token, the script will do this for you. You'll just need the name you named it and the client secret. Account name is just the first segment of your controller URL.
 
-## appd-checkup.py
-# What it does:
+# appd-checkup.py
+## What it does:
 This script will iterate through every application, all of its tiers and nodes, and output into a output.csv file all of that inventory along with agents types and version and the last time that agent reported in in the last year. 
 
-# Use cases:
+## Use cases:
 * Inventory of your AppDynamics agents (reporting or otherwise)
 * Targeting agents for upgrade
 * Understanding what agents may not be working properly / are broken due to deployments or other cahhgnes
