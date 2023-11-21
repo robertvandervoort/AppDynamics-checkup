@@ -17,8 +17,8 @@ debug = False
 
 # Replace with your AppDynamics API client details
 appdynamics_account_name = "customer1"
-appdynamics_API_client_name = "API-client"
-appdynamics_API_client_secret = "123456abc-1234-1234-1234-1234567890ab"
+appdynamics_API_client_name = "API_client"
+appdynamics_API_client_secret = "your_secret_key"
 
 # Replace with the desired output CSV file path
 output_csv_file_path = "output.csv"
@@ -87,7 +87,9 @@ def get_metric(application_name, tier_name, ):
     metric_url = base_url + "/applications/" + application_name + "/metric-data?metric-path=" + metric_path + "&time-range-type=BEFORE_NOW&duration-in-mins=" + str(metric_duration_mins) + "&rollup=" + metric_rollup + "&output=json"
 
     #get metric data
-    print("Retrieving metric from "+metric_url)
+    if debug:
+        print("Retrieving metric from "+metric_url)
+
     metric_response = requests.get(metric_url, headers=__session__.headers)
 
     json_data=metric_response.json()
@@ -136,11 +138,14 @@ with open(output_csv_file_path, "w") as csvfile:
         application_name = application["name"]
         application_description = application["description"]
         application_id = application["id"]
-        print("----" + application_name)
+        print("--- " + application_name)
 
         # Get a list of all tiers for the application
         tiers_url = base_url + "/applications/" + str(application_id) + "/tiers?output=json"
-        print(" ---Fetching tier data from " + tiers_url)
+        
+        if debug:
+            print("--- Fetching tier data from " + tiers_url)
+        
         tiers_response = requests.get(tiers_url, headers=__session__.headers)
         tiers_data = tiers_response.json()
 
@@ -150,17 +155,18 @@ with open(output_csv_file_path, "w") as csvfile:
             tier_id = tier["id"]
             tier_type = tier["type"]
             tier_agentType = tier["agentType"]
-            print("    " + tier_name)
+            print("    --- " + tier_name)
             
             #grab tier availability data
-            print("    Querying for tier availability...")
+            print("    --- Querying for tier availability...")
             availability_values = get_metric(application_name, tier_name)
             dt, value = availability_values
-            print("        Tier last seen on " + str(dt) + " " + str(value) + " nodes seen.")
+            print("    --- Tier last seen on " + str(dt) + " " + str(value) + " nodes seen.")
 
             # Get a list of all nodes for the tier
             nodes_url = base_url + "/applications/" + str(application_id) + "/tiers/" + str(tier_id) + "/nodes?output=json"
-            print("    ----Fetching node data from " + nodes_url)
+            if debug:
+                print("    --- Fetching node data from " + nodes_url)
             nodes_response = requests.get(nodes_url, headers=__session__.headers)
             nodes_data = nodes_response.json()
 
@@ -170,5 +176,8 @@ with open(output_csv_file_path, "w") as csvfile:
                 node_machineAgentVersion = node["machineAgentVersion"]
                 node_appAgentVersion = node["appAgentVersion"]
                 node_agentType = node["agentType"]
-                print("        " + node_name)
+                if (node_agentType == "MACHINE_AGENT"):
+                    dt=""
+                    value=""
+                print("        --- " + node_name)
                 csv_writer.writerow([application_name, application_description, tier_name, dt, value, node_name, node_machineAgentVersion, node_agentType, node_appAgentVersion])
