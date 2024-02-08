@@ -31,6 +31,10 @@ APPDYNAMICS_API_CLIENT_SECRET = ""
 #For reporting on a single application use the ID from the query seen in the URL in AppD,
 application_id = "" # leave this as is and do not comment it out
 
+# Now off by default - setting this to True will write a row in the output CSV representing the number of app nodes seen on a tier and the last time that tier availability was seen. 
+# Initially this was useful ro help create this script but now it kind of just confuses the data so we are not grabbing it by default.
+WRITE_TIER_AVAILABILITY_DATA = False
+
 # Replace with the desired output CSV file path and name or leave as it to create dynamically (recommended)
 #OUTPUT_CSV_FILE = "output.csv"
 OUTPUT_CSV_FILE = APPDYNAMICS_ACCOUNT_NAME+"_checkup_"+datetime.date.today().strftime("%m-%d-%Y")+".csv"
@@ -403,10 +407,12 @@ if applications_status == "valid":
                     
                     if value:
                         print(f"        --- Tier last seen on {str(dt)} - {str(value)} nodes seen.")
-                        csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-"])
+                        if WRITE_TIER_AVAILABILITY_DATA:    
+                            csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-"])
                     else:
-                        print("        --- Metric data not returned, message: " + dt)
-                        csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-"])
+                        print(f"        --- Metric data not returned, message: {str(dt)}")
+                        if WRITE_TIER_AVAILABILITY_DATA:    
+                            csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-"])
                         continue #move onto the next tier
                     
                     # Get a list of all nodes for the tier
