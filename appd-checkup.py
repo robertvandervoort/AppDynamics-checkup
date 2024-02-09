@@ -271,10 +271,11 @@ connect(APPDYNAMICS_ACCOUNT_NAME, APPDYNAMICS_API_CLIENT, APPDYNAMICS_API_CLIENT
 # Get a list of all applications
 if not application_id:
     APPLICATIONS_URL = BASE_URL + "/controller/rest/applications?output=json"
+    print("--- Retrieving applications from "+APPLICATIONS_URL)
+
 else:
     APPLICATION_URL = BASE_URL + "/controller/rest/applications/" + str(application_id) + "?output=json"
-
-print("--- Retrieving applications from "+APPLICATIONS_URL)
+    print("--- Retrieving applications from "+APPLICATION_URL)
 
 try:
     if application_id:
@@ -398,7 +399,7 @@ if applications_status == "valid":
                     if DEBUG:
                         print(f"    --- tier name:{tier_name}, tier id: {tier_id} type:{tier_type}, agenttype:{tier_agent_type}")
                     else:
-                        print("    --- " + tier_name)
+                        print(f"    --- tier: {tier_name}")
                     
                     #grab tier availability data
                     print("        --- Querying tier availability.")
@@ -413,7 +414,6 @@ if applications_status == "valid":
                         print(f"        --- Metric data not returned, message: {str(dt)}")
                         if WRITE_TIER_AVAILABILITY_DATA:    
                             csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-"])
-                        continue #move onto the next tier
                     
                     # Get a list of all nodes for the tier
                     nodes_url = BASE_URL + "/controller/rest/applications/" + str(application_id) + "/tiers/" + str(tier_id) + "/nodes?output=json"
@@ -450,7 +450,7 @@ if applications_status == "valid":
                             print("Internal server error.")
                             sys.exit(73)
                         else:
-                            print("Please contact support for assistance.")
+                            print(f"HTTP Error response: {http_error.response.status_code} - Please contact support for assistance.")
                         
                         nodes = {} # Set to an empty dictionary in case of errors
                         nodes_status = "error"
