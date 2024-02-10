@@ -269,27 +269,19 @@ def validate_json(data):
 connect(APPDYNAMICS_ACCOUNT_NAME, APPDYNAMICS_API_CLIENT, APPDYNAMICS_API_CLIENT_SECRET)
 
 # Get a list of all applications
-if not application_id:
+if application_id:
+    APPLICATIONS_URL = BASE_URL + "/controller/rest/applications/" + str(application_id) + "?output=json"
+    print("--- Retrieving applications from "+APPLICATIONS_URL)
+else:
     APPLICATIONS_URL = BASE_URL + "/controller/rest/applications?output=json"
     print("--- Retrieving applications from "+APPLICATIONS_URL)
 
-else:
-    APPLICATION_URL = BASE_URL + "/controller/rest/applications/" + str(application_id) + "?output=json"
-    print("--- Retrieving applications from "+APPLICATION_URL)
-
 try:
-    if application_id:
-        applications_response = requests.get(
-            APPLICATION_URL,
-            headers = __session__.headers,
-            verify = VERIFY_SSL
-        )
-    else:
-        applications_response = requests.get(
-            APPLICATIONS_URL,
-            headers = __session__.headers,
-            verify = VERIFY_SSL
-        )
+    applications_response = requests.get(
+        APPLICATIONS_URL,
+        headers = __session__.headers,
+        verify = VERIFY_SSL
+    )
     applications_response.raise_for_status()  # Raise an exception for any non-2xx status code
 
     applications_data = validate_json(applications_response)
@@ -484,7 +476,7 @@ if applications_status == "valid":
                             node_appAgentVersion = node["appAgentVersion"]
                             node_agent_type = node["agentType"]
                             if DEBUG:
-                                print(f"        --- node name:{node_name}, node id: {node_id} type:{node_type}, agenttype:{node_agent_type}")
+                                print(f"        --- node name:{node_name}, node id: {node_id}, agenttype:{node_agent_type}")
                             else:
                                 print(f"        --- {node_name}")
 
