@@ -9,9 +9,9 @@ import sys
 import json
 import csv
 import datetime
+import time
 import urllib.parse
 import requests
-
 
 #--- CONFIGURATION SECTION ---
 
@@ -20,13 +20,12 @@ import requests
 DEBUG = False
 
 #Replace with your AppDynamics API client details
-APPDYNAMICS_ACCOUNT_NAME = ""
-APPDYNAMICS_API_CLIENT = ""
-APPDYNAMICS_API_CLIENT_SECRET = ""
+APPDYNAMICS_ACCOUNT_NAME = "customer1"
+APPDYNAMICS_API_CLIENT = "your-api-client-name"
+APPDYNAMICS_API_CLIENT_SECRET = "your-super-secret-key-12342134"
 
 #For reporting on a single application use the ID from the query seen in the URL in AppD,
 application_id = "" # leave this as is and do not comment it out
-
 
 # Now off by default - setting this to True will write a row in the output CSV representing the number of app nodes seen on a tier and the last time that tier availability was seen. 
 # Initially this was useful ro help create this script but now it kind of just confuses the data so we are not grabbing it by default.
@@ -64,11 +63,41 @@ https://docs.appdynamics.com/appd/24.x/latest/en/extend-appdynamics/appdynamics-
 """
 METRIC_ROLLUP = "false"
 
+#manages token expiration - do not change these values
+last_token_fetch_time = ""
+token_expiration = 300
+expiration_buffer = 30
+
 #---FUNCTION DEFINITIONS
+def authenticate(state):
+    """get XCSRF token for use in this session"""
+    if state == "reauth":
+        print("Obtaining a freah authentication token.")
+    if state == "initial":
+        print("Begin login.")
+    
+    connect(APPDYNAMICS_ACCOUNT_NAME, APPDYNAMICS_API_CLIENT, APPDYNAMICS_API_CLIENT_SECRET)
+    
+    return
+
+def is_token_valid():
+    """Checks if the access token is valid and not expired."""
+    if DEBUG:
+        print("Checking token validity...")
+
+    if __session__ is None:
+        if DEBUG:
+            print("__session__ not found or empty.")
+        return False
+
+    # Conservative buffer (e.g., 30 seconds before expiration)
+    if DEBUG:
+        print(f"__session__: {__session__}")
+    return time.time() < (token_expiration + last_token_fetch_time - expiration_buffer)
+
 def connect(account, apiclient, secret):
     """Connects to the AppDynamics API and retrieves an OAuth token."""
-
-    global __session__  
+    global __session__, last_token_fetch_time, token_expiration
     __session__ = requests.Session()
 
     url = f"{BASE_URL}/controller/api/oauth/access_token?grant_type=client_credentials&client_id={apiclient}@{account}&client_secret={secret}"
@@ -96,26 +125,27 @@ def connect(account, apiclient, secret):
     if status == "valid":
         if auth_response:
             json_response = auth_response.json()
+            last_token_fetch_time = time.time()
+            token_expiration = json_response['expires_in']
     else:
         print(f"Unable to log in at: {BASE_URL}")
         print("Please check your controller URL and try again.")
         sys.exit(9)
 
-    if DEBUG:
-        print("Session headers:", __session__.headers)
-        print("Auth:", json_response['access_token'])
-
     __session__.headers['X-CSRF-TOKEN'] = json_response['access_token']
     __session__.headers['Authorization'] = f'Bearer {json_response["access_token"]}'
-    print("Logged in!")
-    return True 
-
-def authenticate():
-    #get XCSRF token for use in this session
-    connect(APPDYNAMICS_ACCOUNT_NAME, APPDYNAMICS_API_CLIENT, APPDYNAMICS_API_CLIENT_SECRET)
-    return
+    
+    print("Authenticated with controller.")
+    
+    if DEBUG:
+        print(f"Last token fetch time: {last_token_fetch_time}")
+        print(f"Token expires in: {json_response['expires_in']}")
+        print(f"Session headers: {__session__.headers}")
+    
+    return True
 
 def handle_rest_errors(func):
+    """for handling REST calls"""
     def inner_function(*args, **kwargs):
         error_map = {
             400: "Bad Request - The request was invalid.",
@@ -132,12 +162,6 @@ def handle_rest_errors(func):
         except requests.exceptions.HTTPError as err:
             error_code = err.response.status_code
             error_explanation = error_map.get(error_code, "Unknown HTTP Error")
-            #try authetication up to x times if we get a 401
-            if error_code == "401":
-                while x > 0:
-                    x = 3
-                    authenticate()
-                    x = x-1
             print(f"HTTP Error: {error_code} - {error_explanation}")
             return error_explanation, "error"
         except requests.exceptions.RequestException as err:
@@ -174,14 +198,14 @@ def get_metric(object_type, app, tier, agenttype, node):
         print(f"        --- Begin get_metric({object_type},{app},{tier},{agenttype},{node})")
 
     if object_type == "node":
-        print(f"        --- Querying node availability.")
+        print("        --- Querying node availability.")
         if agenttype == "MACHINE_AGENT":
             metric_path = "Application%20Infrastructure%20Performance%7C" + tier + "%7CIndividual%20Nodes%7C" + node + "%7CAgent%7CMachine%7CAvailability"
         else:
             metric_path = "Application%20Infrastructure%20Performance%7C" + tier + "%7CIndividual%20Nodes%7C" + node + "%7CAgent%7CApp%7CAvailability"
     
     elif object_type == "tier":
-        print(f"        --- Querying tier availability.")
+        print("        --- Querying tier availability.")
         metric_path = "Application%20Infrastructure%20Performance%7C" + tier + "%7CAgent%7CApp%7CAvailability"
         
     # If the machine agents were assigned a tier, the tier reads as an app agent. The availability data would be here instead
@@ -203,7 +227,7 @@ def get_metric(object_type, app, tier, agenttype, node):
     return metric_response
 
 def handle_metric_response(metric_data, metric_data_status):
-    #Processes returned metric JSON data
+    """Processes returned metric JSON data"""
     if DEBUG:
         print("        --- handle_metric_response() - Handling metric data...")
         print(f"        --- handle_metric_response() - metric_data: {metric_data}")
@@ -301,21 +325,24 @@ def validate_json(response):
 
 @handle_rest_errors
 def get_applications():
-    # Get a list of all applications
+    """Get a list of all applications"""
     print("--- Fetching applications...")
+    
+    if not is_token_valid():
+        authenticate("reauth")
 
     if application_id:
         #chosen when user supplied an app id in the config
-        APPLICATIONS_URL = BASE_URL + "/controller/rest/applications/" + str(application_id) + "?output=json"
+        applications_url = BASE_URL + "/controller/rest/applications/" + str(application_id) + "?output=json"
         if DEBUG:
-            print("--- from "+APPLICATIONS_URL)
+            print("--- from "+applications_url)
     else:
-        APPLICATIONS_URL = BASE_URL + "/controller/rest/applications?output=json"
+        applications_url = BASE_URL + "/controller/rest/applications?output=json"
         if DEBUG:
-            print("--- from "+APPLICATIONS_URL)
+            print("--- from "+applications_url)
     
     applications_response = requests.get(
-        APPLICATIONS_URL,
+        applications_url,
         headers = __session__.headers,
         verify = VERIFY_SSL
     )
@@ -326,16 +353,19 @@ def get_applications():
 
 @handle_rest_errors
 def get_tiers(application_id):
-    # Gets the tiers in the application
-    TIERS_URL = BASE_URL + "/controller/rest/applications/" + str(application_id) + "/tiers?output=json"
+    """Gets the tiers in the application"""
+    if not is_token_valid():
+        authenticate("reauth")
+    
+    tiers_url = BASE_URL + "/controller/rest/applications/" + str(application_id) + "/tiers?output=json"
     
     if DEBUG:
-        print("    --- Fetching tiers from: "+ TIERS_URL)
+        print("    --- Fetching tiers from: "+ tiers_url)
     else:
         print("    --- Fetching tiers...")
 
     tiers_response = requests.get(
-        TIERS_URL,
+        tiers_url,
         headers = __session__.headers,
         verify = VERIFY_SSL
     )
@@ -346,6 +376,10 @@ def get_tiers(application_id):
 
 @handle_rest_errors
 def get_nodes(application_id, tier_id):
+    """Gets the nodes in a tier"""
+    if not is_token_valid():
+        authenticate("reauth")
+
     nodes_url = BASE_URL + "/controller/rest/applications/" + str(application_id) + "/tiers/" + str(tier_id) + "/nodes?output=json"
     if DEBUG:
         print(f"        --- Fetching node data from {nodes_url}.")
@@ -361,7 +395,7 @@ def get_nodes(application_id, tier_id):
     return nodes_response
 
 #--- MAIN
-authenticate()
+authenticate("initial")
 
 #Get applications
 applications_response = get_applications()
