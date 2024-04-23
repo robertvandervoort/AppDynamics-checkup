@@ -407,7 +407,7 @@ if applications_status == "valid":
     print("Writing to CSV file: " + OUTPUT_CSV_FILE)
     with open(OUTPUT_CSV_FILE, "w", newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(["Application", "Description", "Tier", "agenttype", "Last up", "Last up count", "Node", "machineAgentVersion", "appAgentVersion"])
+        csv_writer.writerow(["Application", "Description", "Tier", "agenttype", "Last up", "Last up count", "Node", "machineName", "OS", "machineAgentVersion", "appAgentVersion"])
 
         # Iterate over each application and start the output
         for application in applications:
@@ -422,16 +422,16 @@ if applications_status == "valid":
             tiers, tiers_status = validate_json(tiers_response)
             
             if tiers_status == "error":
-                csv_writer.writerow([application_name, application_description, "AN ERROR OCCURRED RETRIEVING TIERS", "", "", "", "", "", ""])
+                csv_writer.writerow([application_name, application_description, "AN ERROR OCCURRED RETRIEVING TIERS", "", "", "", "", "", "", "", ""])
                 continue # do not stop processing through tiers because of an error pulling its tiers
             
             if tiers_status == "empty":
-                csv_writer.writerow([application_name, application_description, "NO TIERS FOUND", "", "", "", "", "", ""])
+                csv_writer.writerow([application_name, application_description, "NO TIERS FOUND", "", "", "", "", "", "", "", ""])
                 continue # do not stop processing through applications because they do not have tiers
 
             if (tiers_status == "valid"):
                 if tiers == []:
-                    csv_writer.writerow([application_name, application_description, "NO TIERS FOUND", "", "", "", "", "", ""])
+                    csv_writer.writerow([application_name, application_description, "NO TIERS FOUND", "", "", "", "", "", "", "", ""])
                     continue # do not stop processing through applications because they do not have tiers
 
                 # Iterate over each tier in the application
@@ -455,11 +455,11 @@ if applications_status == "valid":
                     if value:
                         print(f"        --- Tier last seen on {str(dt)} - {str(value)} nodes seen.")
                         if WRITE_TIER_AVAILABILITY_DATA:    
-                            csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, tier_node_count, "-", "-", "-"])
+                            csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, tier_node_count, "-", "-", "-", "-", "-"])
                     else:
                         print(f"        --- Metric data not returned, message: {str(dt)}")
                         if WRITE_TIER_AVAILABILITY_DATA:    
-                            csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-"])
+                            csv_writer.writerow([application_name, application_description, tier_name, tier_agent_type, dt, value, "-", "-", "-", "-", "-"])
                     
                     # Get a list of all nodes for the tier
                     nodes_response = get_nodes(application_id, tier_id)
@@ -470,12 +470,12 @@ if applications_status == "valid":
                     #write an appropriate line if nodes are not found - rare
                     if nodes_status == "empty":
                         print("        --- NO NODES FOUND!")
-                        csv_writer.writerow([application_name, application_description, tier_name, "", "", "", "No nodes returned", "", ""])
+                        csv_writer.writerow([application_name, application_description, tier_name, "", "", "", "No nodes returned", "", "", "", ""])
                         continue # do not stop processing through tiers because the tier is empty - consider deleting the tier...
 
                     #write an appropriate line if there was an error retrieving nodes
                     elif nodes_status == "error":
-                        csv_writer.writerow([application_name, application_description, tier_name, "", "", "", "ERROR retrieving nodes", "", ""])
+                        csv_writer.writerow([application_name, application_description, tier_name, "", "", "", "ERROR retrieving nodes", "", "", "", ""])
                         continue # do not stop processing through tiers because of an error pulling its nodes
                             
                     # Iterate over each node in the tier and write to the CSV
@@ -483,6 +483,8 @@ if applications_status == "valid":
                         for node in nodes:
                             node_id = node["id"]
                             node_name = node["name"]
+                            node_machineName = node["machineName"]
+                            node_machineOSType = node["machineOSType"]
                             node_machineAgentVersion = node["machineAgentVersion"]
                             node_appAgentVersion = node["appAgentVersion"]
                             node_agent_type = node["agentType"]
@@ -498,11 +500,11 @@ if applications_status == "valid":
                             
                             if value:
                                 print(f"        --- Node last seen on {str(dt)}")
-                                csv_writer.writerow([application_name, application_description, tier_name, node_agent_type, dt, value, node_name, node_machineAgentVersion, node_appAgentVersion])
+                                csv_writer.writerow([application_name, application_description, tier_name, node_agent_type, dt, value, node_name, node_machineName, node_machineOSType, node_machineAgentVersion, node_appAgentVersion])
 
                             else:
                                 print(f"        --- Metric data not returned, message: {dt}")
-                                csv_writer.writerow([application_name, application_description, tier_name, node_agent_type, dt, "", node_name, node_machineAgentVersion, node_appAgentVersion])                   
+                                csv_writer.writerow([application_name, application_description, tier_name, node_agent_type, dt, "", node_name, node_machineName, ßnode_machineOSType, node_machineAgentVersion, node_appAgentVersion])                   
 
 else:
     print(f"No applications returned. Status: {applications_status}")
