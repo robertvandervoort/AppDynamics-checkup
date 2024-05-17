@@ -483,7 +483,7 @@ def get_servers():
 
     if DEBUG:
         servers_data = servers_response.json()
-        servers_data_count = (len(servers_data))1
+        servers_data_count = (len(servers_data))
         print("servers_data length: " + str((servers_data_count)))
 
     return servers_response
