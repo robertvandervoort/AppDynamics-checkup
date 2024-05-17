@@ -394,6 +394,124 @@ def get_nodes(application_id, tier_id):
 
     return nodes_response
 
+@handle_rest_errors
+def get_snapshots(application_id):
+    if not is_token_valid():
+        authenticate("reauth")
+
+    snapshots_url = BASE_URL + "/controller/rest/applications/" + str(application_id) + "/request-snapshots?time-range-type=BEFORE_NOW&duration-in-mins=" + str(METRIC_DURATION_MINS) + "&first-in-chain=true&maximum-results=1000000&output=json"
+
+    if DEBUG:
+        print("    --- Fetching snapshots from: "+ snapshots_url)
+    else:
+        print("    --- Fetching snapshots...")
+
+    snapshots_response = requests.get(
+        snapshots_url,
+        headers = __session__.headers,
+        verify = VERIFY_SSL
+    )
+    #if DEBUG:
+    #    print(f"    --- get_snapshots response: {snapshots_response.text}")
+
+    return snapshots_response
+
+#@handle_rest_errors
+def get_bts(application_id): 
+    '''retrieves business transactions list from the application'''
+    
+    if not is_token_valid():
+        authenticate("reauth")
+
+    bts_url = BASE_URL + "/controller/rest/applications/" + str(application_id) + "/business-transactions"
+
+    if DEBUG:
+        print("    --- Fetching bts from: "+ bts_url)
+    else:
+        print("    --- Fetching bts...")
+
+    bts_response = requests.get(
+        bts_url,
+        headers = __session__.headers,
+        verify = VERIFY_SSL
+    )
+    #if DEBUG:
+    #    print(f"    --- get_bts response: {bts_response.text}")
+
+    #convert the XML to JSON
+    xml_data = bts_response.text
+
+    # Convert XML to an ordered dictionary
+    dict_data = xmltodict.parse(xml_data)
+    
+    #if DEBUG:
+    #    print("    --- BTs output:")
+    #    print(json.dumps(dict_data, indent=4)) 
+    
+    # Create the in-memory map
+    transaction_name_map = {}
+    
+    # Extract data and populate the map
+    for business_transaction in dict_data["business-transactions"]["business-transaction"]:
+        transaction_id = int(business_transaction["id"])  # Now 'id' is  accessed directly
+        transaction_name = business_transaction["name"]
+        entry_point_type = business_transaction.get("entryPointType")
+        tier_name = business_transaction.get("tierName")
+
+        transaction_name_map[transaction_id] = {
+            "name": transaction_name,
+            "entryPointType": entry_point_type,
+            "tierName": tier_name
+        }
+    
+    return transaction_name_map
+
+@handle_rest_errors
+def get_servers():
+    '''Get a list of all servers'''
+    servers_url = BASE_URL + "/controller/sim/v2/user/machines"
+    if DEBUG:
+        print(f"    --- Retrieving Servers from {servers_url}")
+    else:
+        print("    --- Retrieving Servers...")
+              
+    servers_response = requests.get(
+        servers_url,
+        headers = __session__.headers,
+        verify = VERIFY_SSL
+    )
+
+    if DEBUG:
+        servers_data = servers_response.json()
+        servers_data_count = (len(servers_data))1
+        print("servers_data length: " + str((servers_data_count)))
+
+    return servers_response
+
+@handle_rest_errors
+def get_healthRules(application_id):
+    '''retrieves health rules from application(s)'''
+
+    if not is_token_valid():
+        authenticate("reauth")
+
+    healthRules_url = BASE_URL + "/controller/alerting/rest/v1/applications/" + str(application_id) + "/health-rules"
+
+    if DEBUG:
+        print(f"    --- Fetching health rules from: {healthRules_url}")
+    else:
+        print("    --- Fetching health rules...")
+
+    healthRules_response = requests.get(
+        healthRules_url,
+        headers = __session__.headers,
+        verify = VERIFY_SSL
+    )
+    if DEBUG:
+        print(f"    --- get_healthRules response: {healthRules_response.text}")
+
+    return healthRules_response    
+
 #--- MAIN
 authenticate("initial")
 
